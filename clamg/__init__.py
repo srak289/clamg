@@ -3,9 +3,10 @@ import io
 import os
 import yaml
 
-__version__ = 0.3
+__version__ = 0.4
 
 __all__ = []
+
 
 class Base:
     def __init__(self, *args, **kwargs):
@@ -14,7 +15,7 @@ class Base:
                 self.__dict__ = a
         for k, v in kwargs.items():
             if k in allkw:
-                self.__dict__.update({k:v})
+                self.__dict__.update({k: v})
 
     def __getitem__(self, key):
         return self.__dict__[key]
@@ -26,13 +27,26 @@ class Base:
         return iter(self.__dict__)
 
     def __repr__(self):
-        items = [f'{k}={v}' for k, v in self.__dict__.items()]
+        items = [f"{k}={v}" for k, v in self.__dict__.items()]
         return f"<{self.__class__.__name__}({', '.join(items)})>"
+
+    def dump(self):
+        def dumper(o):
+            if hasattr(o, "dump"):
+                return o.dump()
+            elif isinstance(o, dict):
+                return {k: dumper(v) for k, v in o.items()}
+            elif isinstance(o, (list, tuple, set)):
+                return [dumper(x) for x in o]
+            elif isinstance(o, (str, int, bool, float)):
+                return o
+            raise ValueError(f"Unexpected type {type(o)}")
+
+        return {k: dumper(v) for k, v in self.__dict__.items()}
 
 
 def loads(s: str, _yaml=True, _json=False) -> Base:
-    """A string that should be decoded
-    """
+    """A string that should be decoded"""
     if _yaml:
         data = yaml.safe_load(s)
     elif _json:
@@ -40,15 +54,16 @@ def loads(s: str, _yaml=True, _json=False) -> Base:
 
     return unpack(data)
 
+
 __all__ += ["loads"]
 
 
 def load(fp: str | os.PathLike | io.TextIOWrapper, _yaml=True, _json=False) -> Base:
     """
-        Args:
-            fp: will be normalized to a filelike object and read from.
-        Returns:
-            clamg.Base
+    Args:
+        fp: will be normalized to a filelike object and read from.
+    Returns:
+        clamg.Base
     """
     fh = None
 
@@ -66,27 +81,28 @@ def load(fp: str | os.PathLike | io.TextIOWrapper, _yaml=True, _json=False) -> B
 
     return unpack(data)
 
+
 __all__ += ["load"]
 
 
-def unpack(i: object, rk='clamg') -> Base:
+def unpack(i: object, rk="clamg") -> Base:
     """Return a class-attribute model from data
 
-        Args:
-            i: A primitive type like dict, list, str ...
+    Args:
+        i: A primitive type like dict, list, str ...
 
-        Returns:
-            clamg.Base
+    Returns:
+        clamg.Base
     """
     attrs = {}
     if isinstance(i, dict):
         for k, v in i.items():
             if isinstance(v, dict):
-                attrs.update({k:unpack(v, k)})
+                attrs.update({k: unpack(v, k)})
             elif isinstance(v, (list, tuple, set)):
-                attrs.update({k:unpack(v, k)})
+                attrs.update({k: unpack(v, k)})
             elif isinstance(v, (str, int, bool, float)):
-                attrs.update({k:v})
+                attrs.update({k: v})
             else:
                 raise ValueError(f"Unexpected type {type(v)}")
     elif isinstance(i, (list, set, tuple)):
@@ -105,6 +121,7 @@ def unpack(i: object, rk='clamg') -> Base:
         return i
     else:
         raise ValueError(f"Unexpected type {type(i)}")
-    return type(rk[:-1] if rk.endswith('s') else rk, (Base,), {})(attrs)
+    return type(rk[:-1] if rk.endswith("s") else rk, (Base,), {})(attrs)
+
 
 __all__ += ["unpack"]
